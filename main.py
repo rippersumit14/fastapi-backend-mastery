@@ -3,9 +3,10 @@ from scalar_fastapi import get_scalar_api_reference
 
 app = FastAPI(); 
 
-@app.get("/shipment")
-def get_shipment():
+@app.get("/shipment/{id}")
+def get_shipment(id: int) -> dict[str: str]: 
     return {
+        "id": id,
         "Item": "PS5",
         "Status": "In Transit"
     }
@@ -18,5 +19,4 @@ def get_scalar_docs():
     )
     
     
-    
-    
+
