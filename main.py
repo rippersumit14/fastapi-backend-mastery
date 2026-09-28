@@ -60,7 +60,7 @@ def add_shipment(content: str, weight: float) -> dict[str, int]:
     }
 
 
-@app.put("/shipment")
+@app.put("/shipment")  # Full replacement (Put request)
 def update_shipment(
     id: int, content: str, weight: float, status: str
 ) -> dict[str, Any]:
@@ -69,9 +69,30 @@ def update_shipment(
         "weight": weight,
         "status": status,
     }
-    
-    return shipments
 
+    return shipments[id]
+
+
+@app.patch("/shipment")  # Partial replacement (patch request)
+def patch_shipment(id: int, content: str | None = None, weight: float | None = None, status: str | None = None):
+    shipment = shipments[id]
+    #Update the provided fields 
+    if content:
+        shipment["content"] = content
+    if weight:
+        shipment["weight"] = weight
+    if status:
+        shipment["status"] = status
+        
+    shipments[id] = shipment
+    return shipment
+
+
+#Delete request 
+@app.delete("/shipment")
+def delete_shipment(id: int) -> dict[str, str]:
+    shipments.pop(id)
+    return {"Status": f"The shipment with id{id} is deleted"}
 
 # Scalar API documentation
 @app.get("/scalar", include_in_schema=False)
