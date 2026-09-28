@@ -1,6 +1,7 @@
 from typing import Any
 from fastapi import FastAPI, HTTPException, status
 from scalar_fastapi import get_scalar_api_reference
+from .schemas import Shipment
 
 
 app = FastAPI()
@@ -41,17 +42,17 @@ def get_shipment_field(field: str, id: int) -> Any:
 
 
 @app.post("/shipment/post")
-def add_shipment(content: str, weight: float) -> dict[str, int]:
+def add_shipment(body: Shipment) -> dict[str, int]:
     new_id = max(shipments.keys()) + 1
 
-    if weight > 25:
+    if body.weight > 25:
         raise HTTPException(
             status_code=status.HTTP_406_NOT_ACCEPTABLE, detail="Maximum weight limit"
         )
 
     shipments[new_id] = {
-        "content": content,
-        "weight": weight,
+        "content": body.content,
+        "weight": body.weight,
         "status": "placed",
     }
 
