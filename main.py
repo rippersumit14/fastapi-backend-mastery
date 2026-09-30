@@ -1,104 +1,76 @@
-from typing import Any
 from fastapi import FastAPI, HTTPException, status
 from scalar_fastapi import get_scalar_api_reference
-from .schemas import Shipment
 
+from .schemas import ShipmentCreate, ShipmentUpdate, ShipmentRead
 
 app = FastAPI()
 
+### Shipments DataStore as Dict
 shipments = {
-    12701: {"weight": 0.6, "content": "glassware", "status": "placed"},
-    12702: {"weight": 2.3, "content": "books", "status": "shipped"},
-    12703: {"weight": 1.1, "content": "electronics", "status": "delivered"},
-    12704: {"weight": 3.5, "content": "furniture", "status": "in transit"},
-    12705: {"weight": 0.9, "content": "clothing", "status": "returned"},
-    12706: {"weight": 4.0, "content": "appliances", "status": "processing"},
-    12707: {"weight": 1.8, "content": "toys", "status": "placed"},
+    12701: {"weight": 8.2, "content": "aluminum sheets", "status": "placed", "destination": 11002},
+    12702: {"weight": 14.7, "content": "steel rods", "status": "shipped", "destination": 11003},
+    12703: {"weight": 11.4, "content": "copper wires", "status": "delivered", "destination": 11002},
+    12704: {"weight": 17.8, "content": "iron plates", "status": "in transit", "destination": 11005},
+    12705: {"weight": 10.3, "content": "brass fittings", "status": "returned", "destination": 11008},
 }
 
-
-@app.get(
-    "/shipment/latest",
-)  # Static routes are always defined first
-def get_latest_shipment() -> dict[str, Any]:
-    id = max(shipments.keys())
-    return shipments[id]
-
-
-@app.get("/shipment/{id}")  # Dynamic routes are always created after the static route
-def get_shipment(id: int) -> dict[str, Any]:
+# GET Shipment By Id
+@app.get("/shipment", response_model=ShipmentRead)
+def get_shipment(id: int):
+    #Check for shipment with given id 
     if id not in shipments:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Given id does not exist"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Given id doesn't exist"
         )
-
+        
     return shipments[id]
 
-
-# Use path and query parameters together
-@app.get("/shipment/{field}")
-def get_shipment_field(field: str, id: int) -> Any:
-    return shipments[id][field]
-
-
-@app.post("/shipment/post")
-def add_shipment(body: Shipment) -> dict[str, int]:
+# Create new shipment with content and weight
+@app.post("/shipment", response_model=None)
+def submit_shipment(shipment: ShipmentCreate) -> dict[str, int]:
+    # Create and assign shipment a new id 
     new_id = max(shipments.keys()) + 1
-
-    if body.weight > 25:
-        raise HTTPException(
-            status_code=status.HTTP_406_NOT_ACCEPTABLE, detail="Maximum weight limit"
-        )
-
+    # Add to shipments dict
     shipments[new_id] = {
-        "content": body.content,
-        "weight": body.weight,
+        **shipment.model_dump(),
         "status": "placed",
     }
+    # Return id for later use
+    return {"id": new_id}
 
-    return {
-        "id": new_id,
-    }
-
-
-@app.put("/shipment")  # Full replacement (Put request)
-def update_shipment(
-    id: int, content: str, weight: float, status: str
-) -> dict[str, Any]:
-    shipments[id] = {
-        "content": content,
-        "weight": weight,
-        "status": status,
-    }
-
+### Update fields of a shipment
+@app.patch("/shipment", response_model=ShipmentRead)
+def update_shipment(id: int, body: ShipmentUpdate):
+    # Update data with given fields
+    shipments[id].update(body)
     return shipments[id]
 
 
-@app.patch("/shipment")  # Partial replacement (patch request)
-def patch_shipment(id: int, content: str | None = None, weight: float | None = None, status: str | None = None):
-    shipment = shipments[id]
-    #Update the provided fields 
-    if content:
-        shipment["content"] = content
-    if weight:
-        shipment["weight"] = weight
-    if status:
-        shipment["status"] = status
-        
-    shipments[id] = shipment
-    return shipment
-
-
-#Delete request 
+### Delete a shipment by id
 @app.delete("/shipment")
 def delete_shipment(id: int) -> dict[str, str]:
+    # Remove from datastore
     shipments.pop(id)
-    return {"Status": f"The shipment with id{id} is deleted"}
 
-# Scalar API documentation
+    return {"detail": f"Shipment with id #{id} is deleted!"}
+
+
+### Scalar API Documentation
 @app.get("/scalar", include_in_schema=False)
 def get_scalar_docs():
     return get_scalar_api_reference(
         openapi_url=app.openapi_url,
         title="Scalar API",
     )
+
+
+
+
+
+
+
+
+
+
+
