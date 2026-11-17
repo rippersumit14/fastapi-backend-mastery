@@ -1,15 +1,17 @@
 from fastapi import FastAPI, HTTPException, status
-from scalar_fastapi import get_scalar_api_reference
 from fastapi.responses import RedirectResponse
+from scalar_fastapi import get_scalar_api_reference
 
-
-
-# Assuming schemas.py is in root and database.py is in app/ based on previous fixes
 from schemas import ShipmentCreate, ShipmentUpdate, ShipmentRead
-from app.database import shipments, save
+from app.database import Database
 
 # Initialize FastAPI application with a custom title
 app = FastAPI(title="Shipment Management API")
+
+# Initialize and setup the database connection
+db = Database()
+db.connect_to_db()
+db.create_table()
 
 
 @app.get("/shipment", response_model=ShipmentRead)
@@ -17,14 +19,16 @@ def get_shipment(id: int):
     """
     Retrieve a specific shipment by its unique ID.
     """
-    # Guard clause: Check if shipment exists before accessing
-    if id not in shipments:
+    shipment = db.get(id)
+    
+    # Guard clause: Check if shipment exists before returning
+    if shipment is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Shipment with id {id} doesn't exist"
         )
         
-    return shipments[id]
+    return shipment
 
 
 @app.post("/shipment", status_code=status.HTTP_201_CREATED)
@@ -32,19 +36,7 @@ def submit_shipment(shipment: ShipmentCreate) -> dict[str, int]:
     """
     Create a new shipment, assign an auto-incremented ID, and persist to disk.
     """
-    # Generate a new unique ID safely (prevents crash if the database is empty)
-    new_id = max(shipments.keys()) + 1 if shipments else 1
-    
-    # Hydrate the dictionary with validated data and default backend fields
-    shipments[new_id] = {
-        **shipment.model_dump(),
-        "id": str(new_id), # Ensuring ID type consistency if your JSON expects strings
-        "status": "placed",
-    }
-    
-    # Persist in-memory dictionary changes to the JSON file
-    save()
-    
+    new_id = db.create(shipment) 
     return {"id": new_id}
 
 
@@ -53,38 +45,32 @@ def update_shipment(id: int, body: ShipmentUpdate):
     """
     Partially update an existing shipment (e.g., updating its tracking status).
     """
-    if id not in shipments:
+    # Guard clause: Verify the shipment exists in the database
+    if db.get(id) is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Shipment with id {id} doesn't exist"
         )
         
-    # Convert validated Pydantic model to a Python dict. 
-    # exclude_unset=True ensures we only update fields the client explicitly provided.
-    update_data = body.model_dump(exclude_unset=True)
-    shipments[id].update(update_data)
-    
-    save()
-    
-    return shipments[id]
-    
+    # Update the data in SQLite and return the updated record
+    updated_shipment = db.update(id, body)
+    return updated_shipment
+
 
 @app.delete("/shipment")
 def delete_shipment(id: int) -> dict[str, str]:
     """
     Remove a shipment entirely from the datastore by its ID.
     """
-    if id not in shipments:
+    # Guard clause: Verify the shipment exists before trying to delete
+    if db.get(id) is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Shipment with id {id} doesn't exist"
         )
         
-    # Safely pop the record from the dictionary
-    shipments.pop(id)
-    
-    # Persist the deletion to the JSON file so it doesn't reappear on server restart
-    save()
+    # Delete the record from SQLite
+    db.delete(id)
 
     return {"detail": f"Shipment with id #{id} is deleted!"}
 
@@ -103,5 +89,7 @@ def get_scalar_docs():
     
 @app.get("/", include_in_schema=False)
 def home():
+    """
+    Redirect the root URL to the API documentation.
+    """
     return RedirectResponse(url="/scalar")
-
