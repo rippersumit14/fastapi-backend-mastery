@@ -143,4 +143,4 @@ if __name__ == "__main__":
 
     print("\n--- Testing Decorator Context Manager ---")
     with managed_db() as db:
-        print(f"Fetching data for 12702: {db.get(12702)}")
+        print(f"Fetching data for 12702: {db.get(12702)}") 
